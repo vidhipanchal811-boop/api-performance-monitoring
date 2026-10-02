@@ -1,5 +1,13 @@
+from typing import Literal
+from urllib.parse import urlparse
+
 from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app.performance.tester import (
+    run_concurrent_test,
+    run_performance_test,
+)
 
 
 app = FastAPI(
@@ -16,6 +24,33 @@ class UserCreate(BaseModel):
 
 class User(UserCreate):
     id: int
+
+
+class PerformanceTestRequest(BaseModel):
+    url: str
+    number_of_requests: int = Field(
+        default=10,
+        ge=1,
+        le=100
+    )
+    mode: Literal["sequential", "concurrent"] = "sequential"
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        parsed_url = urlparse(value)
+
+        if parsed_url.scheme not in ("http", "https"):
+            raise ValueError(
+                "URL must use http or https"
+            )
+
+        if not parsed_url.netloc:
+            raise ValueError(
+                "Invalid URL"
+            )
+
+        return value
 
 
 users = [
@@ -69,7 +104,9 @@ def get_user(user_id: int):
     status_code=status.HTTP_201_CREATED
 )
 def create_user(user: UserCreate):
-    new_id = max(user.id for user in users) + 1 if users else 1
+    new_id = max(
+        user.id for user in users
+    ) + 1 if users else 1
 
     new_user = User(
         id=new_id,
@@ -82,8 +119,14 @@ def create_user(user: UserCreate):
     return new_user
 
 
-@app.put("/users/{user_id}", response_model=User)
-def update_user(user_id: int, updated_user: UserCreate):
+@app.put(
+    "/users/{user_id}",
+    response_model=User
+)
+def update_user(
+    user_id: int,
+    updated_user: UserCreate
+):
     for index, user in enumerate(users):
         if user.id == user_id:
             updated = User(
@@ -116,3 +159,19 @@ def delete_user(user_id: int):
         status_code=status.HTTP_404_NOT_FOUND,
         detail="User not found"
     )
+
+@app.post("/performance-test")
+async def performance_test(
+    request: PerformanceTestRequest
+):
+    if request.mode == "sequential":
+        return run_performance_test(
+            request.url,
+            request.number_of_requests
+        )
+
+    if request.mode == "concurrent":
+        return await run_concurrent_test(
+            request.url,
+            request.number_of_requests
+        )
