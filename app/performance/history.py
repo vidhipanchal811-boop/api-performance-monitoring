@@ -51,3 +51,23 @@ def get_performance_summary() -> dict:
         "average_success_rate_percent": round(average_success_rate, 2),
         "latest_status": reports[-1]["performance_status"]
     }
+
+
+def get_load_level_comparison() -> list:
+    comparison = []
+
+    for item in performance_history:
+        report = item["report"]
+
+        comparison.append({
+            "generated_at": report["generated_at"],
+            "total_requests": report["total_requests"],
+            "average_response_time_ms": report["average_response_time_ms"],
+            "p95_response_time_ms": report["p95_response_time_ms"],
+            "p99_response_time_ms": report["p99_response_time_ms"],
+            "requests_per_second": report["requests_per_second"],
+            "success_rate_percent": report["success_rate_percent"],
+            "performance_status": report["performance_status"]
+        })
+
+    return comparison

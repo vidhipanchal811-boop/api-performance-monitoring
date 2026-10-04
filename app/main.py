@@ -17,6 +17,7 @@ from app.performance.history import (
     add_performance_report,
     get_performance_history,
     get_performance_summary,
+    get_load_level_comparison,
 )
 
 app = FastAPI(
@@ -205,3 +206,10 @@ async def performance_history():
 @app.get("/performance-summary")
 async def performance_summary():
     return get_performance_summary()
+
+@app.get("/performance-comparison")
+async def performance_comparison():
+    return {
+        "total_tests": len(get_load_level_comparison()),
+        "tests": get_load_level_comparison()
+    }
