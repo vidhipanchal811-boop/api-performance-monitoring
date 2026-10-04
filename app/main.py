@@ -9,6 +9,14 @@ from app.performance.tester import (
     run_performance_test,
 )
 
+from app.performance.reporter import (
+    generate_performance_report,
+)
+
+from app.performance.history import (
+    add_performance_report,
+    get_performance_history,
+)
 
 app = FastAPI(
     title="API Performance Monitoring System",
@@ -165,13 +173,30 @@ async def performance_test(
     request: PerformanceTestRequest
 ):
     if request.mode == "sequential":
-        return run_performance_test(
+        performance_result = run_performance_test(
             request.url,
             request.number_of_requests
         )
 
-    if request.mode == "concurrent":
-        return await run_concurrent_test(
+    elif request.mode == "concurrent":
+        performance_result = await run_concurrent_test(
             request.url,
             request.number_of_requests
         )
+
+    report = generate_performance_report(
+        performance_result
+    )
+
+    add_performance_report(
+        report
+    )
+
+    return report
+
+@app.get("/performance-history")
+async def performance_history():
+    return {
+        "total_tests": len(get_performance_history()),
+        "tests": get_performance_history()
+    }

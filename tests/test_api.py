@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.performance.history import clear_performance_history
 
 
 client = TestClient(app)
@@ -187,37 +188,36 @@ def test_performance_test():
         assert response.status_code == 200
 
         result = response.json()
+        report = result["report"]
 
-        assert result["url"] == url
-        assert result["total_requests"] == 3
-        assert result["successful_requests"] == 3
-        assert result["failed_requests"] == 0
+        assert report["url"] == url
+        assert report["total_requests"] == 3
+        assert report["successful_requests"] == 3
+        assert report["failed_requests"] == 0
 
-        assert result["success_rate_percent"] == 100.0
+        assert report["success_rate_percent"] == 100.0
 
-        assert result["average_response_time_ms"] > 0
-        assert result["minimum_response_time_ms"] > 0
-        assert result["maximum_response_time_ms"] > 0
+        assert report["average_response_time_ms"] > 0
+        assert report["minimum_response_time_ms"] > 0
+        assert report["maximum_response_time_ms"] > 0
 
-        assert result["maximum_response_time_ms"] >= (
-            result["minimum_response_time_ms"]
+        assert report["maximum_response_time_ms"] >= (
+            report["minimum_response_time_ms"]
         )
 
-        assert result["p95_response_time_ms"] > 0
-        assert result["p99_response_time_ms"] > 0
+        assert report["p95_response_time_ms"] > 0
+        assert report["p99_response_time_ms"] > 0
 
-        assert result["p95_response_time_ms"] >= (
-            result["minimum_response_time_ms"]
+        assert report["p95_response_time_ms"] >= (
+            report["minimum_response_time_ms"]
         )
 
-        assert result["p99_response_time_ms"] >= (
-            result["p95_response_time_ms"]
+        assert report["p99_response_time_ms"] >= (
+            report["p95_response_time_ms"]
         )
 
-        assert result["requests_per_second"] > 0
-        assert result["total_test_time_seconds"] > 0
-
-        assert len(result["results"]) == 3
+        assert report["requests_per_second"] > 0
+        assert report["total_test_time_seconds"] > 0
 
     finally:
         server.shutdown()
@@ -239,24 +239,31 @@ def test_concurrent_performance_test():
         assert response.status_code == 200
 
         result = response.json()
+        report = result["report"]
 
-        assert result["total_requests"] == 3
-        assert result["successful_requests"] == 3
-        assert result["failed_requests"] == 0
-        assert result["success_rate_percent"] == 100.0
+        assert report["url"] == url
+        assert report["total_requests"] == 3
+        assert report["successful_requests"] == 3
+        assert report["failed_requests"] == 0
+        assert report["success_rate_percent"] == 100.0
 
-        assert result["p95_response_time_ms"] > 0
-        assert result["p99_response_time_ms"] > 0
+        assert report["average_response_time_ms"] > 0
+        assert report["minimum_response_time_ms"] > 0
+        assert report["maximum_response_time_ms"] > 0
 
-        assert result["p95_response_time_ms"] >= (
-            result["minimum_response_time_ms"]
+        assert report["p95_response_time_ms"] > 0
+        assert report["p99_response_time_ms"] > 0
+
+        assert report["p95_response_time_ms"] >= (
+            report["minimum_response_time_ms"]
         )
 
-        assert result["p99_response_time_ms"] >= (
-            result["p95_response_time_ms"]
+        assert report["p99_response_time_ms"] >= (
+            report["p95_response_time_ms"]
         )
 
-        assert len(result["results"]) == 3
+        assert report["requests_per_second"] > 0
+        assert report["total_test_time_seconds"] > 0
 
     finally:
         server.shutdown()
@@ -278,24 +285,31 @@ def test_sequential_performance_test():
         assert response.status_code == 200
 
         result = response.json()
+        report = result["report"]
 
-        assert result["total_requests"] == 3
-        assert result["successful_requests"] == 3
-        assert result["failed_requests"] == 0
-        assert result["success_rate_percent"] == 100.0
+        assert report["url"] == url
+        assert report["total_requests"] == 3
+        assert report["successful_requests"] == 3
+        assert report["failed_requests"] == 0
+        assert report["success_rate_percent"] == 100.0
 
-        assert result["p95_response_time_ms"] > 0
-        assert result["p99_response_time_ms"] > 0
+        assert report["average_response_time_ms"] > 0
+        assert report["minimum_response_time_ms"] > 0
+        assert report["maximum_response_time_ms"] > 0
 
-        assert result["p95_response_time_ms"] >= (
-            result["minimum_response_time_ms"]
+        assert report["p95_response_time_ms"] > 0
+        assert report["p99_response_time_ms"] > 0
+
+        assert report["p95_response_time_ms"] >= (
+            report["minimum_response_time_ms"]
         )
 
-        assert result["p99_response_time_ms"] >= (
-            result["p95_response_time_ms"]
+        assert report["p99_response_time_ms"] >= (
+            report["p95_response_time_ms"]
         )
 
-        assert len(result["results"]) == 3
+        assert report["requests_per_second"] > 0
+        assert report["total_test_time_seconds"] > 0
 
     finally:
         server.shutdown()
@@ -336,3 +350,89 @@ def test_unsupported_performance_test_url_scheme():
     )
 
     assert response.status_code == 422
+
+def test_performance_history():
+    clear_performance_history()
+
+    server, url = start_test_server()
+
+    try:
+        response = client.post(
+            "/performance-test",
+            json={
+                "url": url,
+                "number_of_requests": 3
+            }
+        )
+
+        assert response.status_code == 200
+
+        history_response = client.get(
+            "/performance-history"
+        )
+
+        assert history_response.status_code == 200
+
+        history = history_response.json()
+
+        assert history["total_tests"] == 1
+        assert len(history["tests"]) == 1
+
+        report = history["tests"][0]["report"]
+
+        assert report["url"] == url
+        assert report["total_requests"] == 3
+        assert report["successful_requests"] == 3
+        assert report["failed_requests"] == 0
+        assert report["performance_status"] == "PASS"
+
+    finally:
+        server.shutdown()
+        clear_performance_history()
+
+def test_multiple_performance_history():
+    clear_performance_history()
+
+    server, url = start_test_server()
+
+    try:
+        first_response = client.post(
+            "/performance-test",
+            json={
+                "url": url,
+                "number_of_requests": 2
+            }
+        )
+
+        assert first_response.status_code == 200
+
+        second_response = client.post(
+            "/performance-test",
+            json={
+                "url": url,
+                "number_of_requests": 4
+            }
+        )
+
+        assert second_response.status_code == 200
+
+        history_response = client.get(
+            "/performance-history"
+        )
+
+        assert history_response.status_code == 200
+
+        history = history_response.json()
+
+        assert history["total_tests"] == 2
+        assert len(history["tests"]) == 2
+
+        first_report = history["tests"][0]["report"]
+        second_report = history["tests"][1]["report"]
+
+        assert first_report["total_requests"] == 2
+        assert second_report["total_requests"] == 4
+
+    finally:
+        server.shutdown()
+        clear_performance_history()
