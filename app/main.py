@@ -16,6 +16,7 @@ from app.performance.reporter import (
 from app.performance.history import (
     add_performance_report,
     get_performance_history,
+    get_performance_summary,
 )
 
 app = FastAPI(
@@ -200,3 +201,7 @@ async def performance_history():
         "total_tests": len(get_performance_history()),
         "tests": get_performance_history()
     }
+
+@app.get("/performance-summary")
+async def performance_summary():
+    return get_performance_summary()
